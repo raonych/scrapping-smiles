@@ -70,17 +70,10 @@ const fs = require("fs");
     while (count <= 10){
         const flightsData = [];
         console.log("Esperando carregamento da pagina de voos...")      
-        //verifica se página de voos ainda esta carregando
-        while(true){
-            try{
-        await driver.wait(until.elementLocated(By.className("skeleton-container")),15000);
-        }catch(error){
-            console.log("página carregada");
-            break;
-        }  
-        }
-        
 
+        //verifica se página de voos ainda esta carregando
+        await waitForLoading(driver);
+                
         //verifica se tem voos disponiveis na página
         try {
         const noFlightsElement = await driver.wait(
@@ -89,7 +82,7 @@ const fs = require("fs");
         );
         await driver.wait(until.elementIsVisible(noFlightsElement), 5000);
         
-        console.log("Sem voos disponíveis .");
+        console.log("Sem voos disponíveis no dia", count);
         count++;
         await passDay(driver);
         continue;
@@ -102,20 +95,25 @@ const fs = require("fs");
 
         let data = await scrollAndSearch(driver);
         flightsData.push(...data);
-        await driver.findElement(By.xpath("//button[span[contains(text(), 'Outras companhias')]]")).click();
+        await driver.findElement(By.xpath("//span[contains(text(), 'Outras companhias')]/ancestor::button[1]")).click();
+        await waitForLoading(driver);
         data = await scrollAndSearch(driver);
         flightsData.push(...data);
 
 
-        console.log(flightsData.length,"nesta pagina")
-        //flightsData.push("Dia"+count,...data);
-        fs.writeFileSync(`voos_dia${count}.json`, JSON.stringify(flightsData, null, 2), "utf-8");
+        console.log(flightsData.length,"voos na pagina do dia ",count)
+
+
+        if (!fs.existsSync("voos_data")) {
+            fs.mkdirSync("voos_data");
+        }
+        fs.writeFileSync(`voos_data/voos_dia${count}.json`, JSON.stringify(flightsData, null, 2), "utf-8");
         count ++;
         console.log("passando para o próximo dia..")
         await passDay(driver);
     }
     
-    
+    await driver.quit();
 })();
 
 //remove a data em milissegundos da url e adiciona um dia
@@ -133,22 +131,6 @@ const passDay = async (driver)=>{
 
 
 const scrollAndSearch = async (driver) =>{
-    while(true){
-        try{               
-            const moreFlights = await driver.findElement(By.id('SelectFlightList-ida-more'));
-            await driver.executeScript("window.scrollBy(0, window.innerHeight);");
-            await driver.wait(until.elementIsVisible(moreFlights), 5000);
-                await driver.wait(until.elementIsEnabled(moreFlights), 5000);
-            await moreFlights.click();
-            console.log("Carregando mais voos...");
-            await driver.sleep(3000);
-        }catch(error){
-            console.log("todos os voos foram carregados");
-            break;
-        }
-        
-    }
-
      while(true){
             try{               
                 const moreFlights = await driver.findElement(By.id('SelectFlightList-ida-more'));
@@ -184,3 +166,14 @@ const scrollAndSearch = async (driver) =>{
 
         return data;
 }
+
+const waitForLoading= async (driver) =>{
+    while(true){
+        try{
+        await driver.wait(until.elementLocated(By.className("skeleton-container")),5000);
+        }catch(error){
+            console.log("página carregada");
+            break;
+        }  
+    }
+} 
